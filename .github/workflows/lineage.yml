@@ -20,11 +20,23 @@ jobs:
         -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
         -d text="🚀 Build Started! Device: Blossom | ROM: LineageOS 20 (A13) | Status: Preparing..."
 
+    - name: Bebaskan Root Partition
+      run: |
+        sudo apt-get clean
+        sudo rm -rf /var/lib/apt/lists/*
+        sudo rm -rf /tmp/* /var/tmp/*
+        sudo journalctl --vacuum-size=50M
+        sudo rm -rf /usr/share/doc
+        sudo rm -rf /usr/share/man
+        sudo rm -rf /usr/local/share/man
+        echo "=== Root disk setelah cleanup ==="
+        df -h /
+
     - name: Maximize Disk Space
       uses: easimon/maximize-build-space@master
       with:
-        root-reserve-mb: 8192
-        swap-size-mb: 8192
+        root-reserve-mb: 4096
+        swap-size-mb: 1
         remove-dotnet: 'true'
         remove-android: 'true'
         remove-haskell: 'true'
@@ -32,31 +44,25 @@ jobs:
         remove-docker-images: 'true'
         build-mount-path: '/mnt/rom'
 
-    - name: Bebaskan Root & Pindahkan APT ke /mnt
+    - name: Setup Swap di Root (Bukan di /mnt/rom)
       run: |
-        # Bebaskan root dulu
-        sudo apt-get clean
-        sudo rm -rf /var/lib/apt/lists/*
-        sudo rm -rf /tmp/*
-        sudo rm -rf /var/tmp/*
-        sudo journalctl --vacuum-size=50M
-
-        # Pindahkan semua apt directory ke /mnt
-        sudo mkdir -p /mnt/apt-cache/cache
-        sudo mkdir -p /mnt/apt-cache/lists
-        sudo mv /var/cache/apt /mnt/apt-cache/cache
-        sudo mv /var/lib/apt/lists /mnt/apt-cache/lists
-        sudo ln -s /mnt/apt-cache/cache /var/cache/apt
-        sudo ln -s /mnt/apt-cache/lists /var/lib/apt/lists
-
-        echo "=== Root disk setelah cleanup ==="
-        df -h /
-
-    - name: Cek Disk & Memory
-      run: |
+        sudo fallocate -l 8G /swap
+        sudo chmod 600 /swap
+        sudo mkswap /swap
+        sudo swapon /swap
         sudo sysctl vm.swappiness=10
+        echo "=== Disk & Memory ==="
         df -h
         free -h
+
+    - name: Pindahkan APT ke /mnt/rom
+      run: |
+        sudo mkdir -p /mnt/rom/apt/cache
+        sudo mkdir -p /mnt/rom/apt/lists
+        sudo mv /var/cache/apt /mnt/rom/apt/cache
+        sudo mv /var/lib/apt/lists /mnt/rom/apt/lists
+        sudo ln -s /mnt/rom/apt/cache /var/cache/apt
+        sudo ln -s /mnt/rom/apt/lists /var/lib/apt/lists
 
     - name: Pasang Paket Dependensi Build System
       env:
@@ -86,7 +92,7 @@ jobs:
 
     - name: Sync Source Android & Manifest Lokal Blossom
       run: |
-        mkdir -p /mnt/rom && cd /mnt/rom
+        cd /mnt/rom
 
         repo init \
           -u https://github.com/LineageOS/android.git \
