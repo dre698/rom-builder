@@ -54,15 +54,27 @@ jobs:
         remove-docker-images: 'true'
         build-mount-path: '/mnt/rom'
 
-    - name: Pindahkan APT ke /mnt/rom
+    - name: Pindahkan APT & TMP ke /mnt/rom
       run: |
+        # Pindah apt cache & lists
         sudo mkdir -p /mnt/rom/apt/cache
         sudo mkdir -p /mnt/rom/apt/lists
         sudo mv /var/cache/apt /mnt/rom/apt/cache
         sudo mv /var/lib/apt/lists /mnt/rom/apt/lists
         sudo ln -s /mnt/rom/apt/cache /var/cache/apt
         sudo ln -s /mnt/rom/apt/lists /var/lib/apt/lists
-        echo "=== Disk setelah maximize ==="
+
+        # Pindah /tmp ke /mnt/rom supaya dpkg extract di sana
+        sudo mkdir -p /mnt/rom/tmp
+        sudo chmod 1777 /mnt/rom/tmp
+        sudo mount --bind /mnt/rom/tmp /tmp
+
+        # Pindah /var/tmp juga
+        sudo mkdir -p /mnt/rom/var-tmp
+        sudo chmod 1777 /mnt/rom/var-tmp
+        sudo mount --bind /mnt/rom/var-tmp /var/tmp
+
+        echo "=== Disk setelah setup ==="
         df -h
 
     - name: Pasang Paket Dependensi Build System
