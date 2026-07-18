@@ -1,7 +1,7 @@
 name: Build LineageOS 21 Blossom
 
 on:
-  workflow_dispatch: # Memunculkan tombol jalankan manual di halaman GitHub Actions HP
+  workflow_dispatch: # Memunculkan tombol manual di GitHub Actions HP
 
 jobs:
   build_rom:
@@ -13,6 +13,13 @@ jobs:
     - name: Checkout Repo Pembangun
       uses: actions/checkout@v4
 
+    - name: Kirim Notifikasi Mulai ke Telegram
+      run: |
+        curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+        -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+        -d text="🚀 *Build Started\!* %0A%0ADevice: *Blossom*%0ACompiler: *dre698-bot*%0AStatus: *Syncing & Preparing\.\.\.*" \
+        -d parse_mode="MarkdownV2"
+
     - name: Bersihkan Storage Server (Hapus Bloatware Ubuntu)
       run: |
         sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
@@ -22,7 +29,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y bison build-essential ccache curl flex g++-multilib gcc-multilib git git-lfs gnupg gperf lib32readline-dev lib32z1-dev libelf-dev liblz4-tool libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 openjdk-17-jdk
-        
+
     - name: Pasang Google Repo Tool
       run: |
         mkdir -p ~/bin
@@ -38,13 +45,13 @@ jobs:
     - name: Sync Source Android & Manifest Lokal Blossom
       run: |
         mkdir rom && cd rom
-        # Ambil base source LineageOS 21 (Android 14)
+        # Inisialisasi base ROM LineageOS 21 (Android 14)
         repo init -u https://github.com/LineageOS/android.git -b lineage-21.0 --git-lfs --depth=1
         
         # Buat folder manifest lokal
         mkdir -p .repo/local_manifests
         
-        # Injeksi manifes terpadu Blossom langsung mengarah ke branch valid di akunmu
+        # Injeksi manifes terpadu Blossom langsung mengarah ke branch valid di akunmu (dre698)
         cat <<EOF > .repo/local_manifests/blossom.xml
         <?xml version="1.0" encoding="UTF-8"?>
         <manifest>
@@ -62,10 +69,10 @@ jobs:
         cd rom
         source build/envsetup.sh
         
-        # Siapkan target kompilasi untuk unified Blossom
+        # Menyiapkan target untuk unified Blossom
         lunch lineage_blossom-userdebug
         
-        # Mulai proses eksekusi kompilasi zip ROM
+        # Mulai proses kompilasi zip ROM
         brunch blossom
 
     - name: Unggah Berkas Hasil Build (.zip ROM)
@@ -73,3 +80,49 @@ jobs:
       with:
         name: LineageOS-21-Blossom
         path: rom/out/target/product/blossom/*.zip
+
+    - name: Mengunggah ROM dan Mengirim Tautan ke Telegram
+      if: success()
+      run: |
+        # Cari file .zip hasil kompilasi
+        ROM_FILE=$(ls rom/out/target/product/blossom/*.zip | head -n 1)
+        ROM_NAME=$(basename "$ROM_FILE")
+        
+        # Upload file ke bashupload (Mendukung file besar beberapa GB)
+        echo "Mengunggah $ROM_NAME ke server cloud..."
+        DOWNLOAD_URL=$(curl -T "$ROM_FILE" "https://bashupload.com/$ROM_NAME")
+        
+        # Kirim link unduhan ke Telegram
+        curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+        -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+        -d text="✅ *Build Success\!* %0A%0ADevice: *Blossom*%0AFile: \`$ROM_NAME\`%0A%0A📥 *Link Download:*%0A$DOWNLOAD_URL" \
+        -d parse_mode="MarkdownV2"
+
+    - name: Notifikasi & Kirim Log Gagal ke Telegram
+      if: failure()
+      run: |
+        # Buat file log ringkas dari sisa proses akhir build
+        echo "=== KUMPULAN LOG EROR BUILD BLOSSOM ===" > error_build.txt
+        if [ -d "rom" ]; then
+          cd rom
+          if [ -f "out/error.log" ]; then
+            cat out/error.log >> ../error_build.txt
+          else
+            echo "Aktivitas terakhir sebelum build terhenti (200 baris):" >> ../error_build.txt
+            tail -n 200 out/verbose.log 2>/dev/null || echo "Tidak ditemukan log spesifik build Android." >> ../error_build.txt
+          fi
+          cd ..
+        else
+          echo "Gagal sebelum masuk ke folder ROM (Kemungkinan eror repo sync/setup)." >> error_build.txt
+        fi
+
+        # Kirim pesan teks pemberitahuan eror
+        curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+        -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+        -d text="❌ *Build Failed\!* %0A%0AProses kompilasi Blossom mengalami eror\. File log \`error_build.txt\` telah dikirim di bawah ini untuk kamu periksa\." \
+        -d parse_mode="MarkdownV2"
+
+        # Kirim file dokumen teks log ke chat Telegram
+        curl -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+             -F document=@"error_build.txt" \
+             "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument"
