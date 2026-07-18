@@ -6,6 +6,7 @@ on:
 jobs:
   build_rom:
     runs-on: ubuntu-22.04
+    timeout-minutes: 360 # Memaksimalkan waktu runner ke batas 6 jam agar tidak cepat mati
     permissions:
       contents: write
 
@@ -39,6 +40,15 @@ jobs:
         libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
         python3 openjdk-17-jdk
 
+    # --- TAMBAHAN BARU: Menyiapkan cache untuk ccache ---
+    - name: Set up GitHub Cache untuk ccache
+      uses: actions/cache@v4
+      with:
+        path: rom/.ccache
+        key: ccache-blossom-${{ github.sha }}
+        restore-keys: |
+          ccache-blossom-
+
     - name: Pasang Google Repo Tool
       run: |
         mkdir -p ~/bin
@@ -53,7 +63,7 @@ jobs:
 
     - name: Sync Source Android & Manifest Lokal Blossom
       run: |
-        mkdir rom && cd rom
+        mkdir -p rom && cd rom
         # Inisialisasi base ROM LineageOS 20 (Android 13)
         repo init -u https://github.com/LineageOS/android.git -b lineage-20.0 --git-lfs --depth=1
         
@@ -78,8 +88,15 @@ jobs:
       run: |
         cd rom
         
-        # Pastikan ccache mati agar memori disk aman dari file duplikat berukuran besar
-        export USE_CCACHE=0
+        # --- PERUBAHAN: Aktifkan ccache ---
+        export USE_CCACHE=1
+        export CCACHE_EXEC=/usr/bin/ccache
+        export CCACHE_DIR=$PWD/.ccache
+        
+        # Batasi ukuran cache maksimal 30GB agar muat di sisa storage runner setelah repo sync
+        ccache -M 30G
+        ccache -o compression=true
+        ccache -s
         
         source build/envsetup.sh
         
