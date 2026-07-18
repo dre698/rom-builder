@@ -122,8 +122,11 @@ jobs:
         cd /mnt/rom
 
         export USE_CCACHE=0
-        export SOONG_MAX_PARALLELISM=4
+        export SOONG_MAX_PARALLELISM=2
+        export SOONG_SKIP_TESTS=true
+        export BUILD_SKIP_SOONG_TESTS=true
         export ALLOW_MISSING_DEPENDENCIES=true
+        export _JAVA_OPTIONS="-Xmx4g"
 
         source build/envsetup.sh
         lunch lineage_blossom-userdebug
