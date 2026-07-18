@@ -46,7 +46,7 @@ jobs:
 
     - name: Setup Swap di Root (Bukan di /mnt/rom)
       run: |
-        sudo fallocate -l 8G /swap
+        sudo fallocate -l 4G /swap
         sudo chmod 600 /swap
         sudo mkswap /swap
         sudo swapon /swap
