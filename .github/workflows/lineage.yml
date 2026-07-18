@@ -1,6 +1,7 @@
 name: Build LineageOS 20 Blossom
 
 on:
+  push:
   workflow_dispatch:
 
 jobs:
@@ -23,7 +24,7 @@ jobs:
       uses: easimon/maximize-build-space@master
       with:
         root-reserve-mb: 8192
-        swap-size-mb: 4096
+        swap-size-mb: 8192
         remove-dotnet: 'true'
         remove-android: 'true'
         remove-haskell: 'true'
@@ -123,15 +124,19 @@ jobs:
 
         export USE_CCACHE=0
         export SOONG_MAX_PARALLELISM=2
-        export SOONG_SKIP_TESTS=true
-        export BUILD_SKIP_SOONG_TESTS=true
         export ALLOW_MISSING_DEPENDENCIES=true
+        export SOONG_ALLOW_MISSING_DEPENDENCIES=true
         export _JAVA_OPTIONS="-Xmx4g"
+        export JACK_SERVER_VM_ARGUMENTS="-Dfile.encoding=UTF-8 -XX:+TieredCompilation -Xmx4g"
 
         source build/envsetup.sh
         lunch lineage_blossom-userdebug
 
-        make bacon -j$(nproc --all) 2>&1 | tee $GITHUB_WORKSPACE/build.log
+        make bacon -j$(nproc --all) \
+          SOONG_SKIP_TESTS=true \
+          BUILD_BROKEN_DISABLE_BAZEL=true \
+          SKIP_ABI_CHECKS=true \
+          2>&1 | tee $GITHUB_WORKSPACE/build.log
 
     - name: Unggah Berkas Hasil Build (.zip ROM)
       if: success()
