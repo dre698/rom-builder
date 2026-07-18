@@ -22,13 +22,20 @@ jobs:
     - name: Maximize Disk Space
       uses: easimon/maximize-build-space@master
       with:
-        root-reserve-mb: 2048
+        root-reserve-mb: 8192
         swap-size-mb: 4096
         remove-dotnet: 'true'
         remove-android: 'true'
         remove-haskell: 'true'
         remove-codeql: 'true'
         remove-docker-images: 'true'
+        build-mount-path: '/mnt/rom'
+
+    - name: Pindahkan APT Cache ke /mnt
+      run: |
+        sudo mkdir -p /mnt/apt-cache
+        sudo mv /var/cache/apt /mnt/apt-cache
+        sudo ln -s /mnt/apt-cache/apt /var/cache/apt
 
     - name: Cek Disk & Memory
       run: |
@@ -64,7 +71,7 @@ jobs:
 
     - name: Sync Source Android & Manifest Lokal Blossom
       run: |
-        mkdir -p $GITHUB_WORKSPACE/rom && cd $GITHUB_WORKSPACE/rom
+        mkdir -p /mnt/rom && cd /mnt/rom
 
         repo init \
           -u https://github.com/LineageOS/android.git \
@@ -112,7 +119,7 @@ jobs:
 
     - name: Jalankan Proses Kompilasi ROM
       run: |
-        cd $GITHUB_WORKSPACE/rom
+        cd /mnt/rom
 
         export USE_CCACHE=0
         export SOONG_MAX_PARALLELISM=4
@@ -128,7 +135,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: LineageOS-20-Blossom
-        path: rom/out/target/product/blossom/*.zip
+        path: /mnt/rom/out/target/product/blossom/*.zip
         retention-days: 7
 
     - name: Pemrosesan Akhir Notifikasi & Berkas Telegram
@@ -138,7 +145,7 @@ jobs:
         TOKEN="${{ secrets.TELEGRAM_TOKEN }}"
 
         if [ "${{ job.status }}" == "success" ]; then
-          ROM_FILE=$(ls $GITHUB_WORKSPACE/rom/out/target/product/blossom/*.zip 2>/dev/null | head -n 1)
+          ROM_FILE=$(ls /mnt/rom/out/target/product/blossom/*.zip 2>/dev/null | head -n 1)
           ROM_NAME=$(basename "$ROM_FILE")
 
           DOWNLOAD_URL=$(curl -T "$ROM_FILE" "https://bashupload.com/$ROM_NAME")
@@ -150,7 +157,7 @@ jobs:
         else
           LOG_FILE="$GITHUB_WORKSPACE/build.log"
           if [ ! -f "$LOG_FILE" ]; then
-            LOG_FILE="$GITHUB_WORKSPACE/rom/out/error.log"
+            LOG_FILE="/mnt/rom/out/error.log"
           fi
 
           if [ -f "$LOG_FILE" ]; then
