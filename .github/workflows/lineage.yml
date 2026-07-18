@@ -17,7 +17,7 @@ jobs:
       run: |
         curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
         -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-        -d text="🚀 *Build Started\!* %0A%0ADevice: *Blossom*%0ACompiler: *dre698-bot*%0AStatus: *Syncing & Preparing\.\.\.*" \
+        -d text="🚀 *Build Started\!* %0A%0ADevice: *Blossom*%0ACompiler: \`dre698-bot\`%0AStatus: *Syncing & Preparing\.\.\.*" \
         -d parse_mode="MarkdownV2"
 
     - name: Bersihkan Storage Server (Hapus Bloatware Ubuntu)
@@ -87,15 +87,17 @@ jobs:
         # Cari file .zip hasil kompilasi
         ROM_FILE=$(ls rom/out/target/product/blossom/*.zip | head -n 1)
         ROM_NAME=$(basename "$ROM_FILE")
-        
-        # Upload file ke bashupload (Mendukung file besar beberapa GB)
         echo "Mengunggah $ROM_NAME ke server cloud..."
         DOWNLOAD_URL=$(curl -T "$ROM_FILE" "https://bashupload.com/$ROM_NAME")
         
-        # Kirim link unduhan ke Telegram
+        # Mengubah karakter dot (.) di URL agar aman bagi MarkdownV2 Telegram
+        SAFE_URL=$(echo "$DOWNLOAD_URL" | sed 's/\./\\./g')
+        SAFE_NAME=$(echo "$ROM_NAME" | sed 's/\./\\./g' | sed 's/_/\\_/g' | sed 's/-/\\-/g')
+
+        # Kirim teks notifikasi link unduhan
         curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
         -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-        -d text="✅ *Build Success\!* %0A%0ADevice: *Blossom*%0AFile: \`$ROM_NAME\`%0A%0A📥 *Link Download:*%0A$DOWNLOAD_URL" \
+        -d text="✅ *Build Success\!* %0A%0ADevice: *Blossom*%0AFile: \`$SAFE_NAME\`%0A%0A📥 *Link Download:*%0A$SAFE_URL" \
         -d parse_mode="MarkdownV2"
 
     - name: Notifikasi & Kirim Log Gagal ke Telegram
@@ -119,7 +121,7 @@ jobs:
         # Kirim pesan teks pemberitahuan eror
         curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
         -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-        -d text="❌ *Build Failed\!* %0A%0AProses kompilasi Blossom mengalami eror\. File log \`error_build.txt\` telah dikirim di bawah ini untuk kamu periksa\." \
+        -d text="❌ *Build Failed\!* %0A%0AProses kompilasi Blossom mengalami eror\. File log \`error_build.txt\` telah dikirim di bawah ini\." \
         -d parse_mode="MarkdownV2"
 
         # Kirim file dokumen teks log ke chat Telegram
