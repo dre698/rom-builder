@@ -32,11 +32,25 @@ jobs:
         remove-docker-images: 'true'
         build-mount-path: '/mnt/rom'
 
-    - name: Pindahkan APT Cache ke /mnt
+    - name: Bebaskan Root & Pindahkan APT ke /mnt
       run: |
-        sudo mkdir -p /mnt/apt-cache
-        sudo mv /var/cache/apt /mnt/apt-cache
-        sudo ln -s /mnt/apt-cache/apt /var/cache/apt
+        # Bebaskan root dulu
+        sudo apt-get clean
+        sudo rm -rf /var/lib/apt/lists/*
+        sudo rm -rf /tmp/*
+        sudo rm -rf /var/tmp/*
+        sudo journalctl --vacuum-size=50M
+
+        # Pindahkan semua apt directory ke /mnt
+        sudo mkdir -p /mnt/apt-cache/cache
+        sudo mkdir -p /mnt/apt-cache/lists
+        sudo mv /var/cache/apt /mnt/apt-cache/cache
+        sudo mv /var/lib/apt/lists /mnt/apt-cache/lists
+        sudo ln -s /mnt/apt-cache/cache /var/cache/apt
+        sudo ln -s /mnt/apt-cache/lists /var/lib/apt/lists
+
+        echo "=== Root disk setelah cleanup ==="
+        df -h /
 
     - name: Cek Disk & Memory
       run: |
