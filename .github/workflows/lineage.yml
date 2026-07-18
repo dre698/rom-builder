@@ -32,6 +32,16 @@ jobs:
         echo "=== Root disk setelah cleanup ==="
         df -h /
 
+    - name: Setup Swap (Sebelum Maximize)
+      run: |
+        sudo fallocate -l 4G /swap
+        sudo chmod 600 /swap
+        sudo mkswap /swap
+        sudo swapon /swap
+        sudo sysctl vm.swappiness=10
+        echo "=== Swap aktif ==="
+        free -h
+
     - name: Maximize Disk Space
       uses: easimon/maximize-build-space@master
       with:
@@ -44,17 +54,6 @@ jobs:
         remove-docker-images: 'true'
         build-mount-path: '/mnt/rom'
 
-    - name: Setup Swap di Root (Bukan di /mnt/rom)
-      run: |
-        sudo fallocate -l 4G /swap
-        sudo chmod 600 /swap
-        sudo mkswap /swap
-        sudo swapon /swap
-        sudo sysctl vm.swappiness=10
-        echo "=== Disk & Memory ==="
-        df -h
-        free -h
-
     - name: Pindahkan APT ke /mnt/rom
       run: |
         sudo mkdir -p /mnt/rom/apt/cache
@@ -63,6 +62,8 @@ jobs:
         sudo mv /var/lib/apt/lists /mnt/rom/apt/lists
         sudo ln -s /mnt/rom/apt/cache /var/cache/apt
         sudo ln -s /mnt/rom/apt/lists /var/lib/apt/lists
+        echo "=== Disk setelah maximize ==="
+        df -h
 
     - name: Pasang Paket Dependensi Build System
       env:
