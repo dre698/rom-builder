@@ -22,8 +22,8 @@ jobs:
     - name: Maximize Disk Space
       uses: easimon/maximize-build-space@master
       with:
-        root-reserve-mb: 4096
-        swap-size-mb: 12288
+        root-reserve-mb: 2048
+        swap-size-mb: 4096
         remove-dotnet: 'true'
         remove-android: 'true'
         remove-haskell: 'true'
@@ -69,8 +69,8 @@ jobs:
         repo init \
           -u https://github.com/LineageOS/android.git \
           -b lineage-20.0 \
-          --git-lfs \
-          --depth=1
+          --depth=1 \
+          --groups=default,-darwin,-notdefault
 
         mkdir -p .repo/local_manifests
         cat <<EOF > .repo/local_manifests/blossom.xml
@@ -95,7 +95,13 @@ jobs:
         </manifest>
         EOF
 
-        repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+        repo sync -c -j$(nproc --all) \
+          --force-sync \
+          --no-clone-bundle \
+          --no-tags \
+          --optimized-fetch \
+          --no-repo-verify \
+          -f
 
     - name: Cek Sisa Disk Sebelum Build
       run: |
