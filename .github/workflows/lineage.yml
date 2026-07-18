@@ -17,8 +17,7 @@ jobs:
       run: |
         curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
         -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-        -d text="🚀 *Build Started\!* %0A%0ADevice: *Blossom*%0ACompiler: \`dre698-bot\`%0AStatus: *Syncing & Preparing\.\.\.*" \
-        -d parse_mode="MarkdownV2"
+        -d text="🚀 Build Started! Device: Blossom | Compiler: dre698-bot | Status: Preparing System..."
 
     - name: Bersihkan Storage Server (Hapus Bloatware Ubuntu)
       run: |
@@ -72,59 +71,47 @@ jobs:
         # Menyiapkan target untuk unified Blossom
         lunch lineage_blossom-userdebug
         
-        # Mulai proses kompilasi zip ROM
-        brunch blossom
+        # Mulai proses kompilasi zip ROM, output log diarahkan ke build.log
+        brunch blossom 2>&1 | tee ../build.log
 
     - name: Unggah Berkas Hasil Build (.zip ROM)
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: LineageOS-21-Blossom
         path: rom/out/target/product/blossom/*.zip
 
-    - name: Mengunggah ROM dan Mengirim Tautan ke Telegram
-      if: success()
+    - name: Pemrosesan Akhir Notifikasi & Berkas Telegram
+      if: always()
       run: |
-        # Cari file .zip hasil kompilasi
-        ROM_FILE=$(ls rom/out/target/product/blossom/*.zip | head -n 1)
-        ROM_NAME=$(basename "$ROM_FILE")
-        echo "Mengunggah $ROM_NAME ke server cloud..."
-        DOWNLOAD_URL=$(curl -T "$ROM_FILE" "https://bashupload.com/$ROM_NAME")
+        CHAT="${{ secrets.TELEGRAM_CHAT_ID }}"
+        TOKEN="${{ secrets.TELEGRAM_TOKEN }}"
         
-        # Mengubah karakter dot (.) di URL agar aman bagi MarkdownV2 Telegram
-        SAFE_URL=$(echo "$DOWNLOAD_URL" | sed 's/\./\\./g')
-        SAFE_NAME=$(echo "$ROM_NAME" | sed 's/\./\\./g' | sed 's/_/\\_/g' | sed 's/-/\\-/g')
-
-        # Kirim teks notifikasi link unduhan
-        curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
-        -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-        -d text="✅ *Build Success\!* %0A%0ADevice: *Blossom*%0AFile: \`$SAFE_NAME\`%0A%0A📥 *Link Download:*%0A$SAFE_URL" \
-        -d parse_mode="MarkdownV2"
-
-    - name: Notifikasi & Kirim Log Gagal ke Telegram
-      if: failure()
-      run: |
-        # Buat file log ringkas dari sisa proses akhir build
-        echo "=== KUMPULAN LOG EROR BUILD BLOSSOM ===" > error_build.txt
-        if [ -d "rom" ]; then
-          cd rom
-          if [ -f "out/error.log" ]; then
-            cat out/error.log >> ../error_build.txt
-          else
-            echo "Aktivitas terakhir sebelum build terhenti (200 baris):" >> ../error_build.txt
-            tail -n 200 out/verbose.log 2>/dev/null || echo "Tidak ditemukan log spesifik build Android." >> ../error_build.txt
-          fi
-          cd ..
+        if [ "${{ job.status }}" == "success" ]; then
+          ROM_FILE=$(ls rom/out/target/product/blossom/*.zip | head -n 1)
+          ROM_NAME=$(basename "$ROM_FILE")
+          
+          echo "Mengunggah $ROM_NAME ke server temporary cloud..."
+          DOWNLOAD_URL=$(curl -T "$ROM_FILE" "https://bashupload.com/$ROM_NAME")
+          
+          CAPTION=$(printf "✅ Build Succeeded!\nDevice: Blossom\nFile: %s\n\n📥 Download Link:\n%s" "$ROM_NAME" "$DOWNLOAD_URL")
+          
+          curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            -d chat_id="$CHAT" \
+            -d text="$CAPTION"
         else
-          echo "Gagal sebelum masuk ke folder ROM (Kemungkinan eror repo sync/setup)." >> error_build.txt
+          # Jika gagal atau dibatalkan, siapkan berkas log
+          if [ ! -f "build.log" ]; then
+            if [ -f "rom/out/error.log" ]; then
+              cp rom/out/error.log build.log
+            else
+              echo "Build stopped early. Checking last 200 lines of setup:" > build.log
+              tail -n 200 rom/out/verbose.log >> build.log 2>/dev/null || echo "No verbose log available." >> build.log
+            fi
+          fi
+          
+          curl -s -F chat_id="$CHAT" \
+            -F document=@build.log \
+            -F caption="❌ Build failed for Blossom. Check the attached log for core errors." \
+            "https://api.telegram.org/bot${TOKEN}/sendDocument"
         fi
-
-        # Kirim pesan teks pemberitahuan eror
-        curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
-        -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-        -d text="❌ *Build Failed\!* %0A%0AProses kompilasi Blossom mengalami eror\. File log \`error_build.txt\` telah dikirim di bawah ini\." \
-        -d parse_mode="MarkdownV2"
-
-        # Kirim file dokumen teks log ke chat Telegram
-        curl -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-             -F document=@"error_build.txt" \
-             "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument"
