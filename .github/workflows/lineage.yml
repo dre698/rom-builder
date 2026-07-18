@@ -29,17 +29,7 @@ jobs:
         sudo rm -rf /usr/share/doc
         sudo rm -rf /usr/share/man
         sudo rm -rf /usr/local/share/man
-        echo "=== Root disk setelah cleanup ==="
         df -h /
-
-    - name: Setup Swap (Sebelum Maximize)
-      run: |
-        sudo fallocate -l 4G /swap
-        sudo chmod 600 /swap
-        sudo mkswap /swap
-        sudo swapon /swap
-        sudo sysctl vm.swappiness=10
-        free -h
 
     - name: Pasang Paket Dependensi Build System
       env:
@@ -56,6 +46,7 @@ jobs:
           python3 openjdk-17-jdk
         sudo apt-get clean
         sudo rm -rf /var/lib/apt/lists/*
+        df -h /
 
     - name: Maximize Disk Space
       uses: easimon/maximize-build-space@master
@@ -69,8 +60,19 @@ jobs:
         remove-docker-images: 'true'
         build-mount-path: '/mnt/rom'
 
-    - name: Cek Disk & Memory
+    - name: Setup Swap di /mnt/rom (Setelah Maximize)
       run: |
+        # Matikan swap kecil dari maximize-build-space
+        sudo swapoff -a
+
+        # Buat swap besar di partisi besar (/mnt/rom)
+        sudo fallocate -l 8G /mnt/rom/swapfile
+        sudo chmod 600 /mnt/rom/swapfile
+        sudo mkswap /mnt/rom/swapfile
+        sudo swapon /mnt/rom/swapfile
+        sudo sysctl vm.swappiness=10
+
+        echo "=== Disk & Memory ==="
         df -h
         free -h
 
@@ -94,6 +96,8 @@ jobs:
           -u https://github.com/LineageOS/android.git \
           -b lineage-20.0 \
           --depth=1 \
+          --partial-clone \
+          --clone-filter=blob:none \
           --groups=default,-darwin,-notdefault
 
         mkdir -p .repo/local_manifests
@@ -131,7 +135,7 @@ jobs:
       run: |
         echo "=== Disk Usage ==="
         df -h
-        echo "=== Memory ==="
+        echo "=== Memory & Swap ==="
         free -h
 
     - name: Jalankan Proses Kompilasi ROM
