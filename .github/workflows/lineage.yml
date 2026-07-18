@@ -39,43 +39,7 @@ jobs:
         sudo mkswap /swap
         sudo swapon /swap
         sudo sysctl vm.swappiness=10
-        echo "=== Swap aktif ==="
         free -h
-
-    - name: Maximize Disk Space
-      uses: easimon/maximize-build-space@master
-      with:
-        root-reserve-mb: 4096
-        swap-size-mb: 1
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
-        remove-docker-images: 'true'
-        build-mount-path: '/mnt/rom'
-
-    - name: Pindahkan APT & TMP ke /mnt/rom
-      run: |
-        # Pindah apt cache & lists
-        sudo mkdir -p /mnt/rom/apt/cache
-        sudo mkdir -p /mnt/rom/apt/lists
-        sudo mv /var/cache/apt /mnt/rom/apt/cache
-        sudo mv /var/lib/apt/lists /mnt/rom/apt/lists
-        sudo ln -s /mnt/rom/apt/cache /var/cache/apt
-        sudo ln -s /mnt/rom/apt/lists /var/lib/apt/lists
-
-        # Pindah /tmp ke /mnt/rom supaya dpkg extract di sana
-        sudo mkdir -p /mnt/rom/tmp
-        sudo chmod 1777 /mnt/rom/tmp
-        sudo mount --bind /mnt/rom/tmp /tmp
-
-        # Pindah /var/tmp juga
-        sudo mkdir -p /mnt/rom/var-tmp
-        sudo chmod 1777 /mnt/rom/var-tmp
-        sudo mount --bind /mnt/rom/var-tmp /var/tmp
-
-        echo "=== Disk setelah setup ==="
-        df -h
 
     - name: Pasang Paket Dependensi Build System
       env:
@@ -90,6 +54,25 @@ jobs:
           liblz4-tool libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop \
           pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
           python3 openjdk-17-jdk
+        sudo apt-get clean
+        sudo rm -rf /var/lib/apt/lists/*
+
+    - name: Maximize Disk Space
+      uses: easimon/maximize-build-space@master
+      with:
+        root-reserve-mb: 4096
+        swap-size-mb: 1
+        remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+        remove-codeql: 'true'
+        remove-docker-images: 'true'
+        build-mount-path: '/mnt/rom'
+
+    - name: Cek Disk & Memory
+      run: |
+        df -h
+        free -h
 
     - name: Pasang Google Repo Tool
       run: |
