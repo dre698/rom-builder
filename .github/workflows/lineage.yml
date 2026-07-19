@@ -1,202 +1,77 @@
-name: Build LineageOS 20 Blossom
+name: Build LineageOS 20 for Blossom
 
 on:
-  push:
-  workflow_dispatch:
+  workflow_dispatch: # Membuat tombol "Run workflow" manual di halaman GitHub Actions
 
 jobs:
-  build_rom:
+  build:
     runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-
     steps:
-    - name: Checkout Repo Pembangun
-      uses: actions/checkout@v4
+      - name: 1. Checkout Repositori
+        uses: actions/checkout@v4
 
-    - name: Kirim Notifikasi Mulai ke Telegram
-      run: |
-        curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
-        -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-        -d text="🚀 Build Started! Device: Blossom | ROM: LineageOS 20 (A13) | Status: Preparing..."
+      - name: 2. Amankan Storage & Buat Swap 8GB (Anti OOM)
+        run: |
+          sudo systemctl stop docker
+          sudo rm -rf /var/lib/docker /usr/libexec/docker /usr/share/miniconda /usr/local/share/powershell /usr/share/swift
+          sudo apt-get clean
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
 
-    - name: Bebaskan Root Partition
-      run: |
-        sudo apt-get clean
-        sudo rm -rf /var/lib/apt/lists/*
-        sudo rm -rf /tmp/* /var/tmp/*
-        sudo journalctl --vacuum-size=50M
-        sudo rm -rf /usr/share/doc
-        sudo rm -rf /usr/share/man
-        sudo rm -rf /usr/local/share/man
-        df -h /
+      - name: 3. Pasang Tools Kompilasi & Perbaikan Ncurses
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential curl flex g++-multilib \
+            gcc-multilib git gnupg gperf libxml2 libxml2-utils lzop rsync \
+            schedtool squashfs-tools xsltproc zip zlib1g-dev libssl-dev byobu tmux \
+            python-is-python3 libncurses-dev imagemagick libelf-dev pkg-config pngcrush jq
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libncurses.so.6 /usr/lib/x86_64-linux-gnu/libncurses.so.5
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
+          mkdir -p ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          sudo ln -sf ~/bin/repo /usr/bin/repo
 
-    - name: Pasang Paket Dependensi Build System
-      env:
-        DEBIAN_FRONTEND: noninteractive
-      run: |
-        sudo sed -i 's|http://archive.ubuntu.com|http://azure.archive.ubuntu.com|g' /etc/apt/sources.list
-        sudo sed -i 's|http://security.ubuntu.com|http://azure.archive.ubuntu.com|g' /etc/apt/sources.list
-        sudo apt update
-        sudo apt install -y -o Dpkg::Options::="--force-confnew" \
-          bison build-essential ccache curl flex g++-multilib gcc-multilib \
-          git git-lfs gnupg gperf lib32readline-dev lib32z1-dev libelf-dev \
-          liblz4-tool libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop \
-          pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
-          python3 openjdk-17-jdk
-        sudo apt-get clean
-        sudo rm -rf /var/lib/apt/lists/*
-        df -h /
+      - name: 4. Inisialisasi Identitas Git & Repo Sync
+        run: |
+          git config --global user.name "dre698"
+          git config --global user.email "dre698@users.noreply.github.com"
+          repo init -u https://github.com/LineageOS/android.git -b lineage-20.0 --git-lfs
+          repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
-    - name: Maximize Disk Space
-      uses: easimon/maximize-build-space@master
-      with:
-        root-reserve-mb: 4096
-        swap-size-mb: 1
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
-        remove-docker-images: 'true'
-        build-mount-path: '/mnt/rom'
+      - name: 5. Klon Device, Vendor, Kernel, & SEPolicy Trees
+        run: |
+          git clone https://github.com/dre698/device_xiaomi_blossom.git -b lineage-20 device/xiaomi/blossom
+          git clone https://github.com/dre698/proprietary_vendor_xiaomi_blossom.git -b lineage-20 vendor/xiaomi/blossom
+          git clone https://github.com/dre698/device_xiaomi_blossom-kernel.git -b lineage-20 kernel/xiaomi/blossom
+          git clone https://github.com/LineageOS/android_device_mediatek_sepolicy_vndr.git -b lineage-20 device/mediatek/sepolicy_vndr
 
-    - name: Setup Swap di /mnt/rom (Setelah Maximize)
-      run: |
-        # Matikan swap kecil dari maximize-build-space
-        sudo swapoff -a
+      - name: 6. Eksekusi Kompilasi ROM (User Build)
+        run: |
+          rm -rf .repo
+          . build/envsetup.sh
+          export WITHOUT_CHECK_API=true
+          lunch lineage_blossom-user
+          make bacon -j2
 
-        # Buat swap besar di partisi besar (/mnt/rom)
-        sudo fallocate -l 8G /mnt/rom/swapfile
-        sudo chmod 600 /mnt/rom/swapfile
-        sudo mkswap /mnt/rom/swapfile
-        sudo swapon /mnt/rom/swapfile
-        sudo sysctl vm.swappiness=10
-
-        echo "=== Disk & Memory ==="
-        df -h
-        free -h
-
-    - name: Pasang Google Repo Tool
-      run: |
-        mkdir -p ~/bin
-        curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-        chmod a+x ~/bin/repo
-        sudo ln -sf ~/bin/repo /usr/bin/repo
-
-    - name: Setel Identitas Git
-      run: |
-        git config --global user.name "dre698-bot"
-        git config --global user.email "dre698@github.local"
-
-    - name: Sync Source Android & Manifest Lokal Blossom
-      run: |
-        cd /mnt/rom
-
-        repo init \
-          -u https://github.com/LineageOS/android.git \
-          -b lineage-20.0 \
-          --depth=1 \
-          --partial-clone \
-          --clone-filter=blob:none \
-          --groups=default,-darwin,-notdefault
-
-        mkdir -p .repo/local_manifests
-        cat <<EOF > .repo/local_manifests/blossom.xml
-        <?xml version="1.0" encoding="UTF-8"?>
-        <manifest>
-          <project name="dre698/device_xiaomi_blossom"
-                   path="device/xiaomi/blossom"
-                   remote="github"
-                   revision="lineage-20" />
-          <project name="dre698/proprietary_vendor_xiaomi_blossom"
-                   path="vendor/xiaomi/blossom"
-                   remote="github"
-                   revision="lineage-20" />
-          <project name="dre698/device_xiaomi_blossom-kernel"
-                   path="device/xiaomi/blossom-kernel"
-                   remote="github"
-                   revision="lineage-20" />
-          <project name="LineageOS/android_device_mediatek_sepolicy_vndr"
-                   path="device/mediatek/sepolicy_vndr"
-                   remote="github"
-                   revision="lineage-20" />
-        </manifest>
-        EOF
-
-        repo sync -c -j$(nproc --all) \
-          --force-sync \
-          --no-clone-bundle \
-          --no-tags \
-          --optimized-fetch \
-          --no-repo-verify \
-          -f
-
-    - name: Cek Sisa Disk Sebelum Build
-      run: |
-        echo "=== Disk Usage ==="
-        df -h
-        echo "=== Memory & Swap ==="
-        free -h
-
-    - name: Jalankan Proses Kompilasi ROM
-      run: |
-        cd /mnt/rom
-
-        export USE_CCACHE=0
-        export SOONG_MAX_PARALLELISM=2
-        export ALLOW_MISSING_DEPENDENCIES=true
-        export SOONG_ALLOW_MISSING_DEPENDENCIES=true
-        export _JAVA_OPTIONS="-Xmx4g"
-        export JACK_SERVER_VM_ARGUMENTS="-Dfile.encoding=UTF-8 -XX:+TieredCompilation -Xmx4g"
-
-        source build/envsetup.sh
-        lunch lineage_blossom-userdebug
-
-        make bacon -j$(nproc --all) \
-          SOONG_SKIP_TESTS=true \
-          BUILD_BROKEN_DISABLE_BAZEL=true \
-          SKIP_ABI_CHECKS=true \
-          2>&1 | tee $GITHUB_WORKSPACE/build.log
-
-    - name: Unggah Berkas Hasil Build (.zip ROM)
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: LineageOS-20-Blossom
-        path: /mnt/rom/out/target/product/blossom/*.zip
-        retention-days: 7
-
-    - name: Pemrosesan Akhir Notifikasi & Berkas Telegram
-      if: always()
-      run: |
-        CHAT="${{ secrets.TELEGRAM_CHAT_ID }}"
-        TOKEN="${{ secrets.TELEGRAM_TOKEN }}"
-
-        if [ "${{ job.status }}" == "success" ]; then
-          ROM_FILE=$(ls /mnt/rom/out/target/product/blossom/*.zip 2>/dev/null | head -n 1)
-          ROM_NAME=$(basename "$ROM_FILE")
-
-          DOWNLOAD_URL=$(curl -T "$ROM_FILE" "https://bashupload.com/$ROM_NAME")
-
-          CAPTION=$(printf "✅ Build Succeeded!\nDevice: Blossom (LineageOS 20 / A13)\nFile: %s\n\n📥 Download:\n%s" "$ROM_NAME" "$DOWNLOAD_URL")
-          curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
-            -d chat_id="$CHAT" \
-            -d text="$CAPTION"
-        else
-          LOG_FILE="$GITHUB_WORKSPACE/build.log"
-          if [ ! -f "$LOG_FILE" ]; then
-            LOG_FILE="/mnt/rom/out/error.log"
-          fi
-
-          if [ -f "$LOG_FILE" ]; then
-            tail -n 300 "$LOG_FILE" > /tmp/error_tail.log
-            curl -s -F chat_id="$CHAT" \
-              -F document=@/tmp/error_tail.log \
-              -F caption="❌ Build Failed! Blossom (A13) — Log 300 baris terakhir terlampir." \
-              "https://api.telegram.org/bot${TOKEN}/sendDocument"
+      - name: 7. Unggah Hasil Kompilasi ke GoFile
+        run: |
+          ZIP_FILE=$(ls out/target/product/blossom/*.zip | head -n 1)
+          if [ -f "$ZIP_FILE" ]; then
+            echo "Menemukan file ROM: $ZIP_FILE"
+            echo "Mencari server GoFile terbaik..."
+            SERVER=$(curl -s https://api.gofile.io/servers | jq -r '.data.servers[0].name')
+            echo "Mengunggah ke server: $SERVER"
+            RESPONSE=$(curl -F "file=@$ZIP_FILE" "https://${SERVER}.gofile.io/contents/upload")
+            DOWNLOAD_LINK=$(echo "$RESPONSE" | jq -r '.data.downloadPage')
+            echo "=================================================="
+            echo "PROSES BERHASIL! UNDUH ROM KAMU DI SINI:"
+            echo "$DOWNLOAD_LINK"
+            echo "=================================================="
           else
-            curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
-              -d chat_id="$CHAT" \
-              -d text="❌ Build Failed! Blossom (A13) — Tidak ada log tersedia."
+            echo "Error: File ZIP hasil kompilasi tidak ditemukan!"
+            exit 1
           fi
-        fi
+          
