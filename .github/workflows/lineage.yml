@@ -1,6 +1,7 @@
 name: Build LineageOS 20 for Blossom
 
 on:
+  push:
   workflow_dispatch: # Membuat tombol "Run workflow" manual di halaman GitHub Actions
 
 jobs:
@@ -15,10 +16,15 @@ jobs:
           sudo systemctl stop docker
           sudo rm -rf /var/lib/docker /usr/libexec/docker /usr/share/miniconda /usr/local/share/powershell /usr/share/swift
           sudo apt-get clean
+          # Matikan dan hapus swap bawaan GitHub agar tidak "Text file busy"
+          sudo swapoff /swapfile || true
+          sudo rm -f /swapfile || true
+          # Buat ulang swap baru sebesar 8GB
           sudo fallocate -l 8G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
+
 
       - name: 3. Pasang Tools Kompilasi & Perbaikan Ncurses
         run: |
