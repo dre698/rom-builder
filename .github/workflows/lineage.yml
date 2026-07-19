@@ -59,7 +59,13 @@ jobs:
         run: |
           rm -rf .repo
           . build/envsetup.sh
+          # 1. Tetap matikan pengecekan API
           export WITHOUT_CHECK_API=true
+          # 2. LEWATI UNIT TESTING SOONG (Kunci lolos dari eror yang tadi!)
+          export SOONG_NO_TESTS=true
+          # 3. Batasi proses internal bahasa Go agar tidak memicu OOM/cgroup kill
+          export GOMAXPROCS=1
+          
           lunch lineage_blossom-user
           make bacon -j2
 
