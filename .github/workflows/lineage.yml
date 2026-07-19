@@ -13,18 +13,18 @@ jobs:
 
       - name: 2. Amankan Storage & Buat Swap 8GB (Anti OOM)
         run: |
-          sudo systemctl stop docker
+          sudo systemctl stop docker || true
+          # Pembersihan ekstrim: Babat habis dotnet, android SDK bawaan, dan Haskell ghc
           sudo rm -rf /var/lib/docker /usr/libexec/docker /usr/share/miniconda /usr/local/share/powershell /usr/share/swift
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo apt-get clean
-          # Matikan dan hapus swap bawaan GitHub agar tidak "Text file busy"
+          # Atur ulang swap file
           sudo swapoff /swapfile || true
           sudo rm -f /swapfile || true
-          # Buat ulang swap baru sebesar 8GB
           sudo fallocate -l 8G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
-
 
       - name: 3. Pasang Tools Kompilasi & Perbaikan Ncurses
         run: |
@@ -40,11 +40,12 @@ jobs:
           chmod a+x ~/bin/repo
           sudo ln -sf ~/bin/repo /usr/bin/repo
 
-      - name: 4. Inisialisasi Identitas Git & Repo Sync
+      - name: 4. Inisialisasi Identitas Git & Repo Sync (Shallow Clone)
         run: |
           git config --global user.name "dre698"
           git config --global user.email "dre698@users.noreply.github.com"
-          repo init -u https://github.com/LineageOS/android.git -b lineage-20.0 --git-lfs
+          # Menambahkan --depth=1 untuk menghemat ruang penyimpanan secara masif!
+          repo init -u https://github.com/LineageOS/android.git -b lineage-20.0 --git-lfs --depth=1
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
       - name: 5. Klon Device, Vendor, Kernel, & SEPolicy Trees
@@ -80,4 +81,3 @@ jobs:
             echo "Error: File ZIP hasil kompilasi tidak ditemukan!"
             exit 1
           fi
-          
