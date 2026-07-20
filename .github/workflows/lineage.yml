@@ -62,21 +62,22 @@ jobs:
           cp device/xiaomi/blossom-kernel/Image.gz device/xiaomi/blossom-kernel/kernel
           cp device/xiaomi/blossom-kernel/dtb/mt6765.dtb device/xiaomi/blossom-kernel/dtb.img
           
-          # D. Buat SWAP 10GB (Seimbang untuk RAM & Storage)
+          # D. Buat SWAP 12GB (Cukup lega untuk proteksi OOM)
           sudo swapoff /swapfile || true
           sudo rm -f /swapfile || true
-          sudo fallocate -l 10G /swapfile
+          sudo fallocate -l 12G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
           
-          # E. Setup environment & Penjinak Memori Soong/Go Runtime
+          # E. Setup environment & Penjinak Memori Soong/Go
           . build/envsetup.sh
-          export GOGC=15
+          export GOGC=10
           export GOFLAGS="-parallel=1"
-          export GOMAXPROCS=2
+          export GOMAXPROCS=1
           export MALLOC_ARENA_MAX=2
           export WITHOUT_CHECK_API=true
+          export SOONG_ALLOW_MISSING_DEPENDENCIES=true
           
           # F. Mulai Hajar Build!
           lunch lineage_blossom-user
