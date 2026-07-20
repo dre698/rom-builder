@@ -39,13 +39,14 @@ jobs:
           repo init -u https://github.com/LineageOS/android.git -b lineage-20.0 --git-lfs --depth=1
           repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
-      - name: 5. Klon Device, Vendor, Kernel, & SEPolicy Trees
+      - name: 5. Clone Device, Vendor, Kernel, & SEPolicy Trees
         run: |
           git clone https://github.com/dre698/device_xiaomi_blossom.git -b lineage-20 device/xiaomi/blossom
           git clone https://github.com/dre698/proprietary_vendor_xiaomi_blossom.git -b lineage-20 vendor/xiaomi/blossom
           git clone https://github.com/dre698/device_xiaomi_blossom-kernel.git -b lineage-20 kernel/xiaomi/blossom
           git clone https://github.com/LineageOS/android_device_mediatek_sepolicy_vndr.git -b lineage-20 device/mediatek/sepolicy_vndr
-
+          git clone https://github.com/LineageOS/android_hardware_mediatek.git -b lineage-20 hardware/mediatek
+          
       - name: 6. Pembersihan Cache & Eksekusi Kompilasi ROM
         run: |
           # A. Hapus folder git cache (.repo) terlebih dahulu agar storage kembali kosong melompong
