@@ -50,7 +50,7 @@ jobs:
       - name: 6. Pembersihan Cache & Eksekusi Kompilasi ROM
         run: |
           # A. Hapus folder git cache (.repo) terlebih dahulu agar storage kembali kosong melompong
-          rm -rf .repo
+          #rm -rf .repo
 
           cp device/xiaomi/blossom-kernel/Image.gz device/xiaomi/blossom-kernel/kernel
           cp device/xiaomi/blossom-kernel/dtb/mt6765.dtb device/xiaomi/blossom-kernel/dtb.img
