@@ -53,6 +53,7 @@ jobs:
           rm -rf .repo
 
           cp device/xiaomi/blossom-kernel/Image.gz device/xiaomi/blossom-kernel/kernel
+          cp device/xiaomi/blossom-kernel/dtb/mt6765.dtb device/xiaomi/blossom-kernel/dtb.img
           
           # B. SEKARANG BARU BUAT SWAP 16GB (Storage sudah sangat aman karena .repo dihapus)
           sudo swapoff /swapfile || true
