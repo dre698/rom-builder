@@ -7,16 +7,15 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: 1. Maximize Runner Disk Space (Pembersihan Harddisk VM)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swift: true
+      - name: 1. Amankan Storage (Pembersihan Manual Aman VM)
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/share/powershell
+          sudo rm -rf /usr/share/swift
+          sudo apt-get clean
 
       - name: 2. Checkout Repositori
         uses: actions/checkout@v4
@@ -63,19 +62,20 @@ jobs:
           cp device/xiaomi/blossom-kernel/Image.gz device/xiaomi/blossom-kernel/kernel
           cp device/xiaomi/blossom-kernel/dtb/mt6765.dtb device/xiaomi/blossom-kernel/dtb.img
           
-          # D. Buat SWAP 8GB (dihemat dari 16GB agar sisa storage lega untuk folder out/)
+          # D. Buat SWAP 10GB (Seimbang untuk RAM & Storage)
           sudo swapoff /swapfile || true
           sudo rm -f /swapfile || true
-          sudo fallocate -l 8G /swapfile
+          sudo fallocate -l 10G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
           
-          # E. Setup environment & penjinak Go Runtime
+          # E. Setup environment & Penjinak Memori Soong/Go Runtime
           . build/envsetup.sh
-          export GOGC=20
+          export GOGC=15
           export GOFLAGS="-parallel=1"
-          export GOMAXPROCS=1
+          export GOMAXPROCS=2
+          export MALLOC_ARENA_MAX=2
           export WITHOUT_CHECK_API=true
           
           # F. Mulai Hajar Build!
