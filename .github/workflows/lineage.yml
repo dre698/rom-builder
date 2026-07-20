@@ -43,7 +43,7 @@ jobs:
         run: |
           git clone https://github.com/dre698/device_xiaomi_blossom.git -b lineage-20 device/xiaomi/blossom
           git clone https://github.com/dre698/proprietary_vendor_xiaomi_blossom.git -b lineage-20 vendor/xiaomi/blossom
-          git clone https://github.com/dre698/device_xiaomi_blossom-kernel.git -b lineage-20 kernel/xiaomi/blossom-kernel
+          git clone https://github.com/dre698/device_xiaomi_blossom-kernel.git -b lineage-20 device/xiaomi/blossom-kernel
           git clone https://github.com/LineageOS/android_device_mediatek_sepolicy_vndr.git -b lineage-20 device/mediatek/sepolicy_vndr
           git clone https://github.com/LineageOS/android_hardware_mediatek.git -b lineage-20 hardware/mediatek
           
